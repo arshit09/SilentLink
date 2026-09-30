@@ -1,0 +1,14 @@
+# Configuration with sensitive secret token — copy from config.example.json
+config.json
+
+# Runtime logs
+*.log
+
+# OS generated files
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
+
+# IDE and editor directories
+.vscode/
+.idea/

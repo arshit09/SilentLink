@@ -1,0 +1,30 @@
+{
+  "hibernate": {
+    "path": "shutdown /h",
+    "description": "Put PC into Hibernate"
+  },
+  "sleep": {
+    "path": "rundll32.exe powrprof.dll,SetSuspendState 0,1,0",
+    "description": "Put PC to Sleep"
+  },
+  "lock": {
+    "path": "rundll32.exe user32.dll,LockWorkStation",
+    "description": "Lock Windows Workstation"
+  },
+  "dota2": {
+    "path": "cmd.exe /c start steam://rungameid/570",
+    "description": "Launch Dota 2 via Steam"
+  },
+  "discord": {
+    "path": "cmd.exe /c start discord:",
+    "description": "Launch Discord"
+  },
+  "notepad": {
+    "path": "notepad.exe",
+    "description": "Opens Windows Notepad"
+  },
+  "calc": {
+    "path": "calc.exe",
+    "description": "Opens Windows Calculator"
+  }
+}
