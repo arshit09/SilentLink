@@ -4,6 +4,18 @@ config.json
 # Compiled binary — distributed via GitHub Releases, not tracked in source
 SilentLink.exe
 
+# Build output (csc.exe, MSBuild, dotnet CLI)
+bin/
+obj/
+*.pdb
+*.ilk
+*.exe.config
+*.suo
+*.user
+*.csproj.user
+*.sln.docstates
+publish/
+
 # Runtime logs
 *.log
 
@@ -15,3 +27,4 @@ Thumbs.db
 # IDE and editor directories
 .vscode/
 .idea/
+*.swp

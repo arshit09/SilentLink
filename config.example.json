@@ -1,0 +1,5 @@
+{
+  "auth_token": "CHANGE_ME_TO_A_LONG_RANDOM_STRING",
+  "port": 5000,
+  "restrict_to_local_network": true
+}
