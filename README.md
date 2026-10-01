@@ -19,6 +19,14 @@ This project solves that pain point. It runs silently as a background service on
 
 ---
 
+## 📥 Install
+
+1. Download **`SilentLink.exe`** from the [latest release](https://github.com/arshit09/SilentLink/releases/latest).
+2. Put it in the same folder as `start_server.vbs`, `stop_server.bat`, and `commands.json`.
+3. Create your `config.json` — see [Configuration](#%EF%B8%8F-configuration) below.
+
+---
+
 ## 🚀 How to Run
 
 | File | Purpose | What to Expect |
@@ -135,7 +143,7 @@ X-Auth-Token: YOUR_SECRET_KEY
 
 ## 🔨 Building from Source
 
-The pre-built `SilentLink.exe` is included and ready to use. If you want to **modify the source** (`SilentLink.cs`) and recompile it yourself, here's how.
+A pre-built `SilentLink.exe` is attached to every [release](https://github.com/arshit09/SilentLink/releases/latest), so you only need this section if you want to **modify the source** (`SilentLink.cs`) and recompile it yourself.
 
 ### Requirements
 - Windows (any version with .NET Framework 4.0+, which is pre-installed on every modern Windows)

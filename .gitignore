@@ -1,6 +1,9 @@
 # Configuration with sensitive secret token — copy from config.example.json
 config.json
 
+# Compiled binary — distributed via GitHub Releases, not tracked in source
+SilentLink.exe
+
 # Runtime logs
 *.log
 
