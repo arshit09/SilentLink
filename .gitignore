@@ -1,5 +1,7 @@
 # Configuration with sensitive secret token — copy from config.example.json
 config.json
+# Backup written by generate_token.bat; holds a real token too
+config.json.bak
 
 # Compiled binary — distributed via GitHub Releases, not tracked in source
 SilentLink.exe

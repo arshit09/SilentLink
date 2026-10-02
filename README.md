@@ -4,7 +4,7 @@
 
 ---
 
-## 💡 Why This Exists
+## Why This Exists
 
 Apps like **KDE Connect** let you run commands on your PC, but they fall short for quick, everyday use:
 - You have to unlock your phone, open the app, find your PC, and navigate to the commands menu.
@@ -13,24 +13,25 @@ Apps like **KDE Connect** let you run commands on your PC, but they fall short f
 This project solves that pain point. It runs silently as a background service on your PC, accepting authenticated local requests from MacroDroid, Tasker, or shortcuts.
 
 ### Common Use Cases
-- 🛌 **1-Tap from Bed**: Pull down your phone's notification shade and tap a Quick Settings tile to **Hibernate** or **Sleep** your PC across the room.
-- 🎮 **Pre-launch Games**: Tap a tile on your way to your desk to launch **Dota 2** or **Discord** so everything is loaded by the time you sit down.
-- 🔒 **Lock Workstation**: Lock your PC remotely when stepping away.
+- **1-Tap from Bed**: Pull down your phone's notification shade and tap a Quick Settings tile to **Hibernate** or **Sleep** your PC across the room.
+- **Pre-launch Games**: Tap a tile on your way to your desk to launch **Dota 2** or **Discord** so everything is loaded by the time you sit down.
+- **Lock Workstation**: Lock your PC remotely when stepping away.
 
 ---
 
-## 📥 Install
+## Install
 
 1. Download **`SilentLink.exe`** from the [latest release](https://github.com/arshit09/SilentLink/releases/latest).
-2. Put it in the same folder as `start_server.vbs`, `stop_server.bat`, and `commands.json`.
-3. Copy `config.example.json` to `config.json` and set your own `auth_token` — see [Configuration](#%EF%B8%8F-configuration) below.
+2. Put it in the same folder as `start_server.vbs`, `stop_server.bat`, `generate_token.bat`, and `commands.json`.
+3. Run **`generate_token.bat`** and press <kbd>U</kbd> to write a strong random `auth_token` into `config.json`. The server refuses to start without one — see [Configuration](#configuration) below.
 
 ---
 
-## 🚀 How to Run
+## How to Run
 
 | File | Purpose | What to Expect |
 | :--- | :--- | :--- |
+| **`generate_token.bat`** | **Creates your secret token** | Prints a random token; <kbd>C</kbd> copies it, <kbd>U</kbd> saves it into `config.json`, any other key rerolls it. |
 | **`start_server.vbs`** | **Starts the server in the background** | **Nothing will pop up on your screen** (by design!). No black CMD window, no taskbar clutter. |
 | **`stop_server.bat`** | **Stops the server** | Terminates the background process cleanly and displays `SilentLink stopped.` |
 
@@ -47,11 +48,13 @@ Since `start_server.vbs` runs invisibly:
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### 1. Secret Key (`config.json`)
 
-Copy the bundled template, then edit it:
+The quickest way is to run **`generate_token.bat`** and press <kbd>U</kbd> — it creates or
+updates `config.json` for you, keeping your other settings and backing the old file up to
+`config.json.bak`. To do it by hand instead, copy the bundled template and edit it:
 
 ```bat
 copy config.example.json config.json
@@ -67,13 +70,17 @@ copy config.example.json config.json
 
 | Key | Default | Purpose |
 | :--- | :--- | :--- |
-| `auth_token` | *(built-in — see warning)* | Shared secret that every request must present. |
+| `auth_token` | *(none — required)* | Shared secret that every request must present. |
 | `port` | `5000` | TCP port the server listens on. |
 | `restrict_to_local_network` | `true` | When `true`, only loopback and private IPv4 addresses are served. |
 
-> ⚠️ **Create `config.json` before you start using the server.** If the file is missing, SilentLink falls back to a built-in default token that is visible in this public source code — anyone on your network could trigger your actions.
+> **There is no default token.** SilentLink will not start until `config.json` holds a
+> usable `auth_token`, and it shows an error dialog telling you to run `generate_token.bat`.
+> A token is rejected when it is missing, empty, shorter than 16 characters, or one of the
+> placeholders published in this repository. This is deliberate: a built-in fallback would be
+> public in the source, so anyone could trigger your actions.
 
-**Reload behaviour:** `auth_token` and `restrict_to_local_network` are re-read automatically whenever the file changes, so you can rotate your token without restarting. Changing `port` **does** need a restart, because the listener is bound at startup.
+**Reload behaviour:** `auth_token` and `restrict_to_local_network` are re-read automatically whenever the file changes, so you can rotate your token without restarting. Changing `port` **does** need a restart, because the listener is bound at startup. If `config.json` is deleted or its token becomes unusable while the server is running, every request is answered with `503` until a valid token is back.
 
 ### 2. Commands Mapping (`commands.json`)
 
@@ -117,7 +124,7 @@ Action names are matched **case-insensitively**, and `description` is purely for
 
 ---
 
-## 📱 MacroDroid Setup (Android Quick Settings Tile)
+## MacroDroid Setup (Android Quick Settings Tile)
 
 1. In MacroDroid, create a new macro:
    - **Trigger**: **Quick Settings Tile** (e.g. Tile 1 named "Hibernate PC").
@@ -133,7 +140,7 @@ Action names are matched **case-insensitively**, and `description` is purely for
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### Authentication
 
@@ -181,10 +188,11 @@ Any `GET` path other than `/run` answers the health check, so `/` works just as 
 | `404` | Action not found in `commands.json` | `{"status":"error","action":"<name>","message":"Action not defined."}` |
 | `405` | `GET /run` — use `POST` instead | `{"status":"error","message":"Use POST /run."}` |
 | `500` | Action found, but Windows refused to launch it | `{"status":"error","message":"Failed to launch."}` |
+| `503` | Server has no usable `auth_token` | `{"status":"error","message":"Server has no auth_token configured. Run generate_token.bat."}` |
 
 ---
 
-## 🔨 Building from Source
+## Building from Source
 
 Every [release](https://github.com/arshit09/SilentLink/releases/latest) ships a pre-built `SilentLink.exe`, so you only need this section if you want to **change `SilentLink.cs` and produce your own `.exe`**.
 
@@ -259,7 +267,7 @@ Start it directly:
 .\SilentLink.exe
 ```
 
-Your prompt returns immediately and **no window appears** — that is the correct behaviour for a `winexe` build. Confirm it came up by checking `server.log`, which should end with `SilentLink Server is RUNNING on port 5000`, then ping it from another shell:
+Your prompt returns immediately and **no window appears** — that is the correct behaviour for a `winexe` build. If an error dialog appears instead, the build is fine but `config.json` has no usable `auth_token`; run `generate_token.bat` and press <kbd>U</kbd>. Confirm it came up by checking `server.log`, which should end with `SilentLink Server is RUNNING on port 5000`, then ping it from another shell:
 
 ```powershell
 curl.exe -H "X-Auth-Token: YOUR_SECRET_KEY" http://localhost:5000/ping
@@ -279,12 +287,14 @@ curl.exe -H "X-Auth-Token: YOUR_SECRET_KEY" http://localhost:5000/ping
 | Starts, then immediately exits | Read `server.log` for `[MAIN CRASH]`. Usually the port is already taken — change `port` in `config.json`. |
 | No `server.log` is ever created | The exe can't write to its own folder. Move the project somewhere user-writable (not `C:\Program Files`). |
 | Every request returns `401` | `config.json` isn't being read. It must sit **next to the `.exe`**, and your token must match exactly. |
+| A dialog says **SilentLink cannot start** | No usable `auth_token`. Run `generate_token.bat`, press <kbd>U</kbd>, then start the server again. The dialog names the exact problem, and `server.log` records it as `[ABORT]`. |
+| Every request returns `503` | The token went missing while the server was running. Restore `config.json` — the server recovers on the next request, no restart needed. |
 
 ---
 
-## 🔒 Security Notes
+## Security Notes
 
-- **Set your own `auth_token` first.** Without a `config.json`, the server falls back to a default token that is public in this repository.
+- **There is no fallback token.** The server refuses to start without a usable `auth_token` in `config.json`, and rejects placeholders and anything under 16 characters. Use `generate_token.bat` to produce one.
 - Every request needs a valid token via `X-Auth-Token`, `Authorization: Bearer`, or `?token=`. Make it long and random.
 - With `restrict_to_local_network: true`, only loopback and private IPv4 ranges are accepted — `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16`. Anything else gets a `403`. IPv6 callers are rejected too while this is on, so point your phone at your PC's **IPv4** address.
 - Traffic is plain HTTP, so the token crosses your LAN unencrypted. That's fine on home Wi-Fi; don't rely on it on a network you don't trust.

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -17,10 +18,13 @@ namespace SilentLink {
         static string LogFile;
 
         // --- Config cache ---
-        static string AuthToken    = "MyMacroDroidSecretKey2026";
+        // There is no fallback token on purpose. config.json must supply one;
+        // until it does, the server refuses to start and refuses every request.
+        static string AuthToken    = null;
         static int    Port         = 5000;
         static bool   RestrictLocal = true;
         static DateTime _configLastWrite = DateTime.MinValue;
+        static string _configProblem = null;
         static readonly object _configLock = new object();
 
         // --- Commands cache ---
@@ -52,6 +56,19 @@ namespace SilentLink {
 
                 LoadConfigIfChanged();
 
+                // Fail closed: with no usable token there is nothing safe to serve.
+                if (AuthToken == null) {
+                    string why = _configProblem != null
+                               ? _configProblem
+                               : "no usable auth_token was found";
+                    Log("[ABORT] " + why + ". Server not started.");
+                    ShowError("SilentLink cannot start.\r\n\r\n"
+                            + why + ".\r\n\r\n"
+                            + "Run generate_token.bat in the SilentLink folder, press [U] to "
+                            + "save a new token into config.json, then start the server again.");
+                    return;
+                }
+
                 Log("************************************************************");
                 Log(" SilentLink Server is RUNNING on port " + Port);
                 Log("************************************************************");
@@ -81,16 +98,76 @@ namespace SilentLink {
         // Config — only re-reads file when it has actually changed on disk
         // ------------------------------------------------------------------ //
 
+        // Tokens that are published in this repository, as placeholders or as the
+        // old built-in default. They are refused even if pasted into config.json.
+        static readonly string[] RejectedTokens = {
+            "CHANGE_ME_TO_A_LONG_RANDOM_STRING",
+            "YOUR_LONG_RANDOM_SECRET",
+            "YOUR_SECRET_KEY",
+            "MyMacroDroidSecretKey2026"
+        };
+
+        const int MinTokenLength = 16;
+
+        static bool IsUsableToken(string t) {
+            if (string.IsNullOrEmpty(t)) return false;
+            if (t.Length < MinTokenLength) return false;
+            foreach (string bad in RejectedTokens)
+                if (string.Equals(t, bad, StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+
+        static string DescribeTokenProblem(string t) {
+            if (t == null)     return "config.json has no auth_token entry";
+            if (t.Length == 0) return "auth_token in config.json is empty";
+            if (t.Length < MinTokenLength)
+                return "auth_token in config.json is only " + t.Length +
+                       " characters long, the minimum is " + MinTokenLength;
+            return "auth_token in config.json is a placeholder that is public in this repository";
+        }
+
+        // Reports a config problem once, not on every single request.
+        static void ReportConfigProblem(string msg) {
+            if (_configProblem == msg) return;
+            _configProblem = msg;
+            Log("[CONFIG] " + msg + ". Requests are refused until a token is set - "
+              + "run generate_token.bat and press [U].");
+        }
+
+        static void ClearConfigProblem() {
+            if (_configProblem == null) return;
+            _configProblem = null;
+            Log("[CONFIG] auth_token loaded. Server is accepting requests again.");
+        }
+
         static void LoadConfigIfChanged() {
-            if (!File.Exists(ConfigFile)) return;
             try {
+                if (!File.Exists(ConfigFile)) {
+                    lock (_configLock) {
+                        AuthToken = null;
+                        _configLastWrite = DateTime.MinValue;
+                        ReportConfigProblem("config.json is missing");
+                    }
+                    return;
+                }
+
                 DateTime wt = File.GetLastWriteTimeUtc(ConfigFile);
                 lock (_configLock) {
                     if (wt <= _configLastWrite) return;
                     string json = File.ReadAllText(ConfigFile, Encoding.UTF8);
 
-                    Match mToken = Regex.Match(json, "\"auth_token\"\\s*:\\s*\"([^\"]+)\"");
-                    if (mToken.Success) AuthToken = mToken.Groups[1].Value;
+                    Match mToken = Regex.Match(json, "\"auth_token\"\\s*:\\s*\"([^\"]*)\"");
+                    string token = mToken.Success ? mToken.Groups[1].Value : null;
+
+                    if (!IsUsableToken(token)) {
+                        AuthToken = null;
+                        ReportConfigProblem(DescribeTokenProblem(token));
+                        // The timestamp is deliberately not cached here, so a file
+                        // caught mid-write is re-read on the next request.
+                        return;
+                    }
+
+                    AuthToken = token;
 
                     Match mPort = Regex.Match(json, "\"port\"\\s*:\\s*(\\d+)");
                     if (mPort.Success) Port = int.Parse(mPort.Groups[1].Value);
@@ -99,8 +176,22 @@ namespace SilentLink {
                     if (mLocal.Success) RestrictLocal = bool.Parse(mLocal.Groups[1].Value);
 
                     _configLastWrite = wt;
+                    ClearConfigProblem();
                 }
             } catch {}
+        }
+
+        // ------------------------------------------------------------------ //
+        // Error dialog - this is a winexe with no console, so a message box is
+        // the only way the user ever sees a startup failure
+        // ------------------------------------------------------------------ //
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "MessageBoxW")]
+        static extern int ShowMessageBox(IntPtr hWnd, string text, string caption, uint type);
+
+        static void ShowError(string text) {
+            // MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_TOPMOST
+            try { ShowMessageBox(IntPtr.Zero, text, "SilentLink", 0x10 | 0x10000 | 0x40000); } catch {}
         }
 
         // ------------------------------------------------------------------ //
@@ -259,6 +350,14 @@ namespace SilentLink {
                     if (tokenReceived == null && path.IndexOf("token=", StringComparison.Ordinal) >= 0) {
                         Match mTok = Regex.Match(path, "token=([^&]+)");
                         if (mTok.Success) tokenReceived = mTok.Groups[1].Value;
+                    }
+
+                    // --- No usable token configured: serve nothing ---
+                    if (AuthToken == null) {
+                        Log("[BLOCKED] No usable auth_token configured, refused " + clientIp);
+                        SendResponse(stream, 503, "Service Unavailable",
+                            "{\"status\":\"error\",\"message\":\"Server has no auth_token configured. Run generate_token.bat and press U.\"}");
+                        return;
                     }
 
                     // --- Auth ---
